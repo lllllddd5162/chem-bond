@@ -382,45 +382,48 @@ function drawCovalent(key){
   });
 
   // ── PASS 3: Electron dots ─────────────────────────────────────────────────
-  // For each atom: distribute electrons on each shell.
-  // On the outermost shell, skip the angular zone toward each bond partner.
-  // Special case: H has only 1 electron total, always shared → draw nothing for H.
-  // Inner shells: always draw all electrons uniformly.
+  // Inner shells: draw all electrons uniformly.
+  // Outer shell: draw exactly (valence - bondPairs) electrons = lone electrons only.
+  // H: 0 own electrons shown (its 1 electron is always the shared one).
   atoms.forEach((_,i)=>{
     const p=sp[i],el=els[i],shells=el.shells;
-    // H only has 1 valence electron which is fully shared — skip entirely
     if(el.sym==='H') return;
 
     const myBonds=bd.seqs.filter(s=>s.a===i||s.b===i);
-    const EXCL=0.42; // angular exclusion zone around bond direction (~24°)
+    const usedPairs=myBonds.reduce((s,b)=>s+b.t,0);
+    const valence=shells[shells.length-1];
+    const loneCount=Math.max(0, valence-usedPairs); // electrons left on outer shell
 
-    for(let s=0;s<shells.length;s++){
-      const r=shellR(shells,s);
-      const ec=shells[s];
-      const isOuter=(s===shells.length-1);
-      const baseRot=s===0?-Math.PI/2: s===1?-Math.PI/2+0.35: -Math.PI/2+0.7;
-
+    // Inner shells — draw all uniformly
+    for(let s=0;s<shells.length-1;s++){
+      const r=shellR(shells,s), ec=shells[s];
+      const baseRot=s===0?-Math.PI/2:-Math.PI/2+0.35;
       for(let e=0;e<ec;e++){
         const ang=baseRot+(e/ec)*Math.PI*2;
-        const ex=p.x+Math.cos(ang)*r, ey=p.y+Math.sin(ang)*r;
+        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*r,p.y+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      }
+    }
 
-        if(isOuter){
-          let skip=false;
-          for(const bond of myBonds){
-            const partIdx=bond.a===i?bond.b:bond.a;
-            const pp=sp[partIdx];
-            const bondAng=Math.atan2(pp.y-p.y,pp.x-p.x);
-            let diff=ang-bondAng;
-            while(diff>Math.PI)diff-=2*Math.PI;
-            while(diff<-Math.PI)diff+=2*Math.PI;
-            if(Math.abs(diff)<EXCL){skip=true;break;}
-          }
-          if(skip) continue;
-        }
-
-        ctx.beginPath(); ctx.arc(ex,ey,5,0,Math.PI*2);
-        ctx.fillStyle=el.color; ctx.fill();
-        ctx.strokeStyle=BG; ctx.lineWidth=1.5; ctx.stroke();
+    // Outer shell — only lone electrons, placed AWAY from bond partners
+    if(loneCount>0){
+      const vr=shellR(shells,shells.length-1);
+      // Compute average bond direction, place lone electrons on opposite side
+      let awx=0,awy=0;
+      myBonds.forEach(bond=>{
+        const partIdx=bond.a===i?bond.b:bond.a;
+        awx-=(sp[partIdx].x-p.x); awy-=(sp[partIdx].y-p.y);
+      });
+      const awLen=Math.sqrt(awx*awx+awy*awy);
+      const awAng=awLen>0?Math.atan2(awy/awLen,awx/awLen):Math.PI/2;
+      // Spread lone electrons evenly around the away direction
+      const spread=loneCount>1?Math.PI*0.7:0;
+      for(let le=0;le<loneCount;le++){
+        const ang=awAng+(loneCount>1?(le/(loneCount-1)-0.5)*spread:0);
+        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*vr,p.y+Math.sin(ang)*vr,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
       }
     }
   });
@@ -676,34 +679,38 @@ function drawCovalentToWrap(key, targetWrap){
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(sym,p.x,p.y);
   });
-  // Electron dots
+  // Electron dots — inner shells all, outer shell lone pairs only
   atoms.forEach(function(_,i){
     const p=sp[i],el=els[i],shells=el.shells;
     if(el.sym==='H')return;
     const myBonds=bd.seqs.filter(function(s){return s.a===i||s.b===i;});
-    const EXCL=0.42;
-    for(let s=0;s<shells.length;s++){
+    const usedPairs=myBonds.reduce(function(s,b){return s+b.t;},0);
+    const loneCount=Math.max(0,shells[shells.length-1]-usedPairs);
+    // Inner shells — all electrons
+    for(let s=0;s<shells.length-1;s++){
       const r=shellR(shells,s),ec=shells[s];
-      const isOuter=(s===shells.length-1);
-      const baseRot=s===0?-Math.PI/2:s===1?-Math.PI/2+0.35:-Math.PI/2+0.7;
+      const baseRot=s===0?-Math.PI/2:-Math.PI/2+0.35;
       for(let e=0;e<ec;e++){
         const ang=baseRot+(e/ec)*Math.PI*2;
-        const ex=p.x+Math.cos(ang)*r,ey=p.y+Math.sin(ang)*r;
-        if(isOuter){
-          let skip=false;
-          for(let bi=0;bi<myBonds.length;bi++){
-            const bond=myBonds[bi];
-            const partIdx=bond.a===i?bond.b:bond.a;
-            const pp=sp[partIdx];
-            const bondAng=Math.atan2(pp.y-p.y,pp.x-p.x);
-            let diff=ang-bondAng;
-            while(diff>Math.PI)diff-=2*Math.PI;
-            while(diff<-Math.PI)diff+=2*Math.PI;
-            if(Math.abs(diff)<EXCL){skip=true;break;}
-          }
-          if(skip)continue;
-        }
-        ctx.beginPath();ctx.arc(ex,ey,5,0,Math.PI*2);
+        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*r,p.y+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      }
+    }
+    // Outer shell — lone electrons only, placed away from bonds
+    if(loneCount>0){
+      const vr=shellR(shells,shells.length-1);
+      let awx=0,awy=0;
+      myBonds.forEach(function(bond){
+        const partIdx=bond.a===i?bond.b:bond.a;
+        awx-=(sp[partIdx].x-p.x); awy-=(sp[partIdx].y-p.y);
+      });
+      const awLen=Math.sqrt(awx*awx+awy*awy);
+      const awAng=awLen>0?Math.atan2(awy/awLen,awx/awLen):Math.PI/2;
+      const spread=loneCount>1?Math.PI*0.7:0;
+      for(let le=0;le<loneCount;le++){
+        const ang=awAng+(loneCount>1?(le/(loneCount-1)-0.5)*spread:0);
+        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*vr,p.y+Math.sin(ang)*vr,5,0,Math.PI*2);
         ctx.fillStyle=el.color;ctx.fill();
         ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
       }
