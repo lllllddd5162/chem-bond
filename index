@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>화학 결합 탐구 — 공유·이온 결합 시각화</title>
+<style>
+  :root{
+    --bg:#f7f6f2;--surface:#ffffff;--surface2:#f1efe8;
+    --border:rgba(60,60,50,0.13);--border2:rgba(60,60,50,0.22);
+    --text:#1a1a16;--text2:#5f5e5a;--text3:#9c9a92;
+    --blue:#185FA5;--blue-bg:#E6F1FB;--blue-mid:#378ADD;
+    --teal:#0F6E56;--teal-bg:#E1F5EE;--teal-mid:#1D9E75;
+    --coral:#993C1D;--coral-bg:#FAECE7;--amber:#633806;--amber-bg:#FAEEDA;
+    --pink:#72243E;--pink-bg:#FBEAF0;
+    --radius:12px;--radius-sm:8px;--shadow:0 2px 12px rgba(0,0,0,0.07);
+  }
+  @media(prefers-color-scheme:dark){:root{
+    --bg:#1a1a16;--surface:#252520;--surface2:#2c2c28;
+    --border:rgba(255,255,240,0.1);--border2:rgba(255,255,240,0.18);
+    --text:#e8e6de;--text2:#9c9a92;--text3:#5f5e5a;
+    --blue-bg:#0C447C;--teal-bg:#085041;--amber-bg:#633806;--pink-bg:#72243E;
+  }}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  header{padding:28px 24px 20px;border-bottom:0.5px solid var(--border);}
+  header h1{font-size:22px;font-weight:600;letter-spacing:-0.3px;}
+  header p{font-size:13px;color:var(--text2);margin-top:4px;}
+  .container{max-width:760px;margin:0 auto;padding:20px 16px 60px;}
+  .tabs{display:flex;gap:8px;margin-bottom:20px;}
+  .tab{flex:1;padding:11px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text2);cursor:pointer;font-size:14px;font-weight:500;text-align:center;transition:all .15s;font-family:inherit;}
+  .tab:hover{background:var(--surface2);color:var(--text);}
+  .tab.active{background:var(--text);color:var(--bg);border-color:var(--text);}
+  .section{display:none;}.section.active{display:block;}
+  .panel{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow);}
+  .panel-title{font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;}
+  .elements-grid{display:flex;flex-wrap:wrap;gap:7px;}
+  .el-btn{width:56px;height:60px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all .15s;font-family:inherit;}
+  .el-btn:hover{background:var(--surface2);transform:translateY(-1px);}
+  .el-btn .sym{font-size:17px;font-weight:600;color:var(--text);line-height:1;}
+  .el-btn .nm{font-size:9px;color:var(--text3);}
+  .el-btn .vl{font-size:9px;color:var(--text3);}
+  .el-btn.selected{border:2px solid var(--blue-mid);background:var(--blue-bg);}
+  .el-btn.selected .sym{color:var(--blue);}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;}
+  .preset-btn{padding:6px 13px;border:0.5px solid var(--border2);border-radius:20px;background:var(--surface);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;font-family:inherit;}
+  .preset-btn:hover{background:var(--surface2);color:var(--text);}
+  .preset-btn.active{background:var(--teal-bg);border-color:var(--teal-mid);color:var(--teal);font-weight:500;}
+  .selected-display{display:flex;gap:7px;align-items:center;flex-wrap:wrap;min-height:36px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:0.5px solid var(--border);}
+  .sel-chip{padding:4px 11px;background:var(--surface);border:0.5px solid var(--border2);border-radius:20px;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;}
+  .sel-chip:hover{background:#FCEBEB;border-color:#E24B4A;color:#A32D2D;}
+  .placeholder{color:var(--text3);font-size:13px;}
+  .action-row{display:flex;gap:8px;margin-bottom:16px;}
+  .btn-analyze{padding:9px 20px;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .btn-analyze:hover{opacity:0.85;}
+  .btn-clear{padding:9px 16px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:inherit;color:var(--text2);}
+  .btn-clear:hover{color:var(--text);background:var(--surface2);}
+  .vis-area{min-height:260px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:var(--radius-sm);border:0.5px solid var(--border);overflow:auto;margin-bottom:14px;}
+  .vis-placeholder{color:var(--text3);font-size:13px;text-align:center;padding:20px;line-height:1.7;}
+  .result-box{background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px;border:0.5px solid var(--border);}
+  .formula-big{font-size:20px;font-weight:600;margin-bottom:8px;}
+  .bond-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .bond-tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;}
+  .tag-single{background:var(--teal-bg);color:var(--teal);}
+  .tag-double{background:var(--amber-bg);color:var(--amber);}
+  .tag-triple{background:var(--pink-bg);color:var(--pink);}
+  .info-line{font-size:13px;color:var(--text2);line-height:1.7;}
+  .info-line strong{color:var(--text);font-weight:600;}
+  .ion-row{display:flex;gap:10px;}
+  .ion-half{flex:1;}
+  .ion-label{font-size:11px;font-weight:500;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;}
+  canvas{display:block;}
+  .error-msg{color:#A32D2D;}
+
+  .choice-btn{width:100%;padding:12px 14px;border:1.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;font-size:14px;font-weight:500;color:var(--text);text-align:center;transition:all .15s;font-family:inherit;line-height:1.4;}
+  .choice-btn:hover:not(:disabled){background:var(--surface2);border-color:var(--text);}
+  .choice-btn.correct{background:#E1F5EE!important;border-color:#1D9E75!important;color:#0F6E56!important;}
+  .choice-btn.wrong{background:#FAECE7!important;border-color:#D85A30!important;color:#993C1D!important;}
+  .choice-btn:disabled{cursor:default;opacity:0.7;}
+  @media(max-width:480px){.el-btn{width:50px;height:54px;}.el-btn .sym{font-size:15px;}}
+</style>
+</head>
+<body>
+<header>
+  <div style="max-width:760px;margin:0 auto">
+    <h1>화학 결합 탐구</h1>
+    <p>공유 결합과 이온 결합을 원자 구조로 시각화합니다 — 고1 통합과학</p>
+  </div>
+</header>
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('covalent')">⚛ 공유 결합</button>
+    <button class="tab" onclick="switchTab('ionic')">⊕ 이온 결합</button>
+    <button class="tab" onclick="switchTab('quiz')">❓ 퀴즈</button>
+  </div>
+  <div class="section active" id="sec-covalent">
+    <div class="panel">
+      <div class="panel-title">원소 선택 — 클릭하여 추가</div>
+      <div class="elements-grid" id="cov-elements"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">대표 화합물 바로보기</div>
+      <div class="presets" id="cov-presets"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">선택된 원소</div>
+      <div class="selected-display" id="cov-selected"><span class="placeholder">원소를 클릭하거나 대표 화합물을 선택하세요</span></div>
+      <div class="action-row">
+        <button class="btn-analyze" onclick="analyze('covalent')">결합 분석</button>
+        <button class="btn-clear" onclick="clearSel()">초기화</button>
+      </div>
+      <div class="vis-area" id="cov-vis-wrap"><div class="vis-placeholder">원소를 선택하고 결합 분석을 눌러보세요</div></div>
+      <div id="cov-result"></div>
+    </div>
+  </div>
+  <div class="section" id="sec-ionic">
+    <div class="panel">
+      <div class="ion-row">
+        <div class="ion-half">
+          <div class="ion-label">양이온 원소</div>
+          <div class="elements-grid" id="ion-cat-elements"></div>
+        </div>
+        <div class="ion-half">
+          <div class="ion-label">음이온 원소</div>
+          <div class="elements-grid" id="ion-an-elements"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">대표 화합물 바로보기</div>
+      <div class="presets" id="ion-presets"></div>
+    </div>
+    <div class="panel">
+      <div class="vis-area" id="ion-vis-wrap"><div class="vis-placeholder">양이온 + 음이온 원소를 각각 선택하세요</div></div>
+      <div id="ion-result"></div>
+    </div>
+  <!-- QUIZ -->
+  <div class="section" id="sec-quiz">
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:16px;font-weight:600;color:var(--text)" id="quiz-counter">퀴즈 탭을 클릭하면 시작됩니다</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px">그림을 보고 어떤 화합물인지 맞춰보세요</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:13px;color:var(--text2)">점수: <strong id="quiz-score" style="color:var(--text)">0</strong></div>
+          <button class="btn-clear" onclick="startQuiz()" style="padding:7px 14px;font-size:12px;">새 퀴즈</button>
+        </div>
+      </div>
+      <div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:16px;">
+        <div id="quiz-progress" style="height:100%;background:var(--text);border-radius:2px;transition:width .3s;width:0%"></div>
+      </div>
+      <div class="vis-area" id="quiz-vis" style="min-height:300px;"><div class="vis-placeholder">퀴즈 탭을 누르면 시작됩니다</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">어떤 화합물인가요?</div>
+      <div id="quiz-choices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+      <div id="quiz-feedback" style="margin-top:14px;min-height:20px;font-size:14px;text-align:center;font-weight:600;"></div>
+      <div style="margin-top:12px;text-align:center;">
+        <button class="btn-analyze" id="quiz-next-btn" onclick="nextQuiz()" style="display:none;">다음 문제 →</button>
+        <button class="btn-analyze" id="quiz-result-btn" onclick="showQuizResult()" style="display:none;">결과 보기</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const COV_ELS={
+  H: {sym:'H',name:'수소',    val:1,shells:[1],     color:'#3388cc',fill:'#c8e4f8',nfill:'#a0ccf0'},
+  C: {sym:'C',name:'탄소',    val:4,shells:[2,4],   color:'#666660',fill:'#e8e6e0',nfill:'#c8c6c0'},
+  N: {sym:'N',name:'질소',    val:3,shells:[2,5],   color:'#1a9e70',fill:'#b8f0d8',nfill:'#80ddb4'},
+  O: {sym:'O',name:'산소',    val:2,shells:[2,6],   color:'#cc4422',fill:'#fcd8cc',nfill:'#f8a898'},
+  F: {sym:'F',name:'플루오린',val:1,shells:[2,7],   color:'#bb3366',fill:'#fcc8dc',nfill:'#f898bc'},
+  Cl:{sym:'Cl',name:'염소',   val:1,shells:[2,8,7], color:'#448800',fill:'#ccf0a0',nfill:'#99dd55'},
+};
+const ION_CATS={
+  Li:{sym:'Li',name:'리튬',    charge:1,shells:[2,1],    color:'#3388cc',fill:'#c8e4f8',nfill:'#a0ccf0'},
+  Na:{sym:'Na',name:'나트륨',  charge:1,shells:[2,8,1],  color:'#3388cc',fill:'#c8e4f8',nfill:'#a0ccf0'},
+  K: {sym:'K', name:'칼륨',    charge:1,shells:[2,8,8,1],color:'#3388cc',fill:'#c8e4f8',nfill:'#a0ccf0'},
+  Mg:{sym:'Mg',name:'마그네슘',charge:2,shells:[2,8,2],  color:'#1a9e70',fill:'#b8f0d8',nfill:'#80ddb4'},
+  Ca:{sym:'Ca',name:'칼슘',    charge:2,shells:[2,8,8,2],color:'#1a9e70',fill:'#b8f0d8',nfill:'#80ddb4'},
+  Al:{sym:'Al',name:'알루미늄',charge:3,shells:[2,8,3],  color:'#bb8800',fill:'#fce8a0',nfill:'#f8cc55'},
+};
+const ION_ANS={
+  F: {sym:'F', name:'플루오린',charge:-1,shells:[2,7],  color:'#bb3366',fill:'#fcc8dc',nfill:'#f898bc'},
+  Cl:{sym:'Cl',name:'염소',    charge:-1,shells:[2,8,7],color:'#448800',fill:'#ccf0a0',nfill:'#99dd55'},
+  O: {sym:'O', name:'산소',    charge:-2,shells:[2,6],  color:'#cc4422',fill:'#fcd8cc',nfill:'#f8a898'},
+};
+const BOND_DB={
+  HH:   {formula:'H₂', name:'수소',          info:'단일 결합 1쌍',           total:1,seqs:[{a:0,b:1,t:1}],order:['H','H']},
+  FF:   {formula:'F₂', name:'플루오린',       info:'단일 결합 1쌍',           total:1,seqs:[{a:0,b:1,t:1}],order:['F','F']},
+  ClCl: {formula:'Cl₂',name:'염소',           info:'단일 결합 1쌍',           total:1,seqs:[{a:0,b:1,t:1}],order:['Cl','Cl']},
+  FH:   {formula:'HF', name:'플루오린화수소', info:'단일 결합 1쌍',           total:1,seqs:[{a:0,b:1,t:1}],order:['H','F']},
+  ClH:  {formula:'HCl',name:'염화수소',       info:'단일 결합 1쌍',           total:1,seqs:[{a:0,b:1,t:1}],order:['H','Cl']},
+  HHO:  {formula:'H₂O',name:'물',             info:'단일 결합 2쌍 (O 중심)',  total:2,seqs:[{a:1,b:0,t:1},{a:1,b:2,t:1}],order:['H','O','H'],center:1},
+  OO:   {formula:'O₂', name:'산소',           info:'이중 결합 1쌍',           total:2,seqs:[{a:0,b:1,t:2}],order:['O','O']},
+  NN:   {formula:'N₂', name:'질소',           info:'삼중 결합 1쌍',           total:3,seqs:[{a:0,b:1,t:3}],order:['N','N']},
+  OCO:  {formula:'CO₂',name:'이산화탄소',     info:'이중 결합 2쌍 (C 중심)',  total:4,seqs:[{a:1,b:0,t:2},{a:1,b:2,t:2}],order:['O','C','O'],center:1},
+  CHHHH:{formula:'CH₄',name:'메탄',           info:'단일 결합 4쌍 (C 중심)',  total:4,seqs:[{a:0,b:1,t:1},{a:0,b:2,t:1},{a:0,b:3,t:1},{a:0,b:4,t:1}],order:['C','H','H','H','H'],center:0},
+  HHHHN:{formula:'NH₃',name:'암모니아',       info:'단일 결합 3쌍 (N 중심)',  total:3,seqs:[{a:0,b:1,t:1},{a:0,b:2,t:1},{a:0,b:3,t:1}],order:['N','H','H','H'],center:0},
+};
+const COV_PRESETS=[
+  {label:'H₂',key:'HH'},{label:'F₂',key:'FF'},{label:'Cl₂',key:'ClCl'},
+  {label:'HF',key:'FH'},{label:'HCl',key:'ClH'},{label:'H₂O',key:'HHO'},
+  {label:'O₂',key:'OO'},{label:'N₂',key:'NN'},{label:'CO₂',key:'OCO'},
+  {label:'CH₄',key:'CHHHH'},{label:'NH₃',key:'HHHHN'},
+];
+const ION_PRESETS=[
+  {label:'NaCl',cat:'Na',an:'Cl'},{label:'KCl',cat:'K',an:'Cl'},{label:'LiF',cat:'Li',an:'F'},
+  {label:'MgCl₂',cat:'Mg',an:'Cl'},{label:'CaCl₂',cat:'Ca',an:'Cl'},{label:'AlCl₃',cat:'Al',an:'Cl'},
+  {label:'MgO',cat:'Mg',an:'O'},{label:'CaO',cat:'Ca',an:'O'},{label:'Al₂O₃',cat:'Al',an:'O'},
+  {label:'KF',cat:'K',an:'F'},{label:'NaF',cat:'Na',an:'F'},{label:'MgF₂',cat:'Mg',an:'F'},
+];
+
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let covSel=[],ionCat=null,ionAn=null;
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+function init(){
+  document.getElementById('cov-elements').innerHTML=Object.values(COV_ELS).map(e=>
+    `<button class="el-btn" id="ce-${e.sym}" onclick="addCovEl('${e.sym}')">
+      <span class="sym">${e.sym}</span><span class="nm">${e.name}</span><span class="vl">원자가${e.val}</span>
+    </button>`).join('');
+  document.getElementById('cov-presets').innerHTML=COV_PRESETS.map(p=>
+    `<button class="preset-btn" id="cp-${p.key}" onclick="loadCovPreset('${p.key}')">${p.label}</button>`).join('');
+  document.getElementById('ion-cat-elements').innerHTML=Object.values(ION_CATS).map(e=>
+    `<button class="el-btn" id="ic-${e.sym}" onclick="selIon('cat','${e.sym}')">
+      <span class="sym">${e.sym}</span><span class="nm">${e.name}</span><span class="vl">+${e.charge}</span>
+    </button>`).join('');
+  document.getElementById('ion-an-elements').innerHTML=Object.values(ION_ANS).map(e=>
+    `<button class="el-btn" id="ia-${e.sym}" onclick="selIon('an','${e.sym}')">
+      <span class="sym">${e.sym}</span><span class="nm">${e.name}</span><span class="vl">${e.charge}</span>
+    </button>`).join('');
+  document.getElementById('ion-presets').innerHTML=ION_PRESETS.map(p=>
+    `<button class="preset-btn" id="ip-${p.cat}${p.an}" onclick="loadIonPreset('${p.cat}','${p.an}','${p.label}')">${p.label}</button>`).join('');
+}
+
+// ── COV CONTROLS ───────────────────────────────────────────────────────────────
+function addCovEl(sym){covSel.push(sym);refreshCovDisplay();document.querySelectorAll('#cov-presets .preset-btn').forEach(b=>b.classList.remove('active'));}
+function removeCovEl(i){covSel.splice(i,1);refreshCovDisplay();}
+function refreshCovDisplay(){
+  const d=document.getElementById('cov-selected');
+  d.innerHTML=covSel.length?covSel.map((s,i)=>`<span class="sel-chip" onclick="removeCovEl(${i})">${s}</span>`).join(''):'<span class="placeholder">원소를 클릭하거나 대표 화합물을 선택하세요</span>';
+}
+function clearSel(){
+  covSel=[];refreshCovDisplay();
+  document.getElementById('cov-vis-wrap').innerHTML='<div class="vis-placeholder">원소를 선택하고 결합 분석을 눌러보세요</div>';
+  document.getElementById('cov-result').innerHTML='';
+  document.querySelectorAll('#cov-presets .preset-btn').forEach(b=>b.classList.remove('active'));
+}
+function loadCovPreset(key){
+  const bd=BOND_DB[key];if(!bd)return;
+  covSel=[...bd.order];refreshCovDisplay();
+  document.querySelectorAll('#cov-presets .preset-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('cp-'+key).classList.add('active');
+  drawCovalent(key);
+}
+function analyze(type){
+  if(type==='covalent'){
+    const key=findKey(covSel);
+    if(!key){
+      document.getElementById('cov-vis-wrap').innerHTML='<div class="vis-placeholder error-msg">인식되지 않는 조합입니다. 대표 화합물을 선택하거나 올바른 조합을 입력하세요.</div>';
+      document.getElementById('cov-result').innerHTML='';return;
+    }
+    drawCovalent(key);
+  } else analyzeIonic();
+}
+function findKey(atoms){
+  const s=[...atoms].sort().join('');
+  if(BOND_DB[s])return s;
+  const a=atoms.join('');
+  if(BOND_DB[a])return a;
+  for(const k in BOND_DB){
+    const bd=BOND_DB[k];
+    if(bd.order&&bd.order.join('')===a)return k;
+    if(bd.order&&[...bd.order].sort().join('')===s)return k;
+  }
+  return null;
+}
+
+// ── GEOMETRY ──────────────────────────────────────────────────────────────────
+const NUC_R   = 28;   // nucleus circle radius
+const SH_GAP  = 30;   // gap between shell rings
+function shellR(shells,s){ return NUC_R+(s+1)*SH_GAP; }
+function outerR(shells){ return shellR(shells,shells.length-1); }
+function atomBR(shells){ return outerR(shells)+12; }
+
+// Distance so only outermost shells touch (overlap by ~12px), inner shells never cross
+function atomDist(elA,elB){
+  const OV=12;
+  const natural=outerR(elA.shells)+outerR(elB.shells)-OV;
+  // A's outer shell must not enter B's nucleus
+  const minA=outerR(elA.shells)+NUC_R+8;
+  // B's outer shell must not enter A's nucleus
+  const minB=outerR(elB.shells)+NUC_R+8;
+  // Also: if A has inner shells, ensure A's inner shells don't overlap B's outer shell
+  // innermost shell of A that's not the outer = shells.length-2
+  let minInner=0;
+  if(elA.shells.length>=2){
+    const innerR_A=shellR(elA.shells, elA.shells.length-2);
+    // distance must be >= innerR_A + outerR(B) + 10
+    minInner=Math.max(minInner, innerR_A+outerR(elB.shells)+10);
+  }
+  if(elB.shells.length>=2){
+    const innerR_B=shellR(elB.shells, elB.shells.length-2);
+    minInner=Math.max(minInner, innerR_B+outerR(elA.shells)+10);
+  }
+  return Math.max(natural,minA,minB,minInner);
+}
+
+// ── COVALENT DRAWING ──────────────────────────────────────────────────────────
+function drawCovalent(key){
+  const bd=BOND_DB[key];
+  if(!bd||!bd.seqs.length)return;
+  const atoms=bd.order;
+  const n=atoms.length;
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const els=atoms.map(s=>COV_ELS[s]);
+  const BG=isDark?'#2c2c28':'#f5f3ee';
+
+  // ── Atom positions ────────────────────────────────────────────────────────
+  const ci=n>2?(bd.center!==undefined?bd.center:0):-1;
+  const pos=new Array(n);
+  if(n===1){
+    pos[0]={x:0,y:0};
+  } else if(n===2){
+    const d=atomDist(els[0],els[1]);
+    pos[0]={x:-d/2,y:0}; pos[1]={x:d/2,y:0};
+  } else {
+    pos[ci]={x:0,y:0};
+    const branches=[...Array(n).keys()].filter(i=>i!==ci);
+    const angMap={
+      HHO:[-120,120], OCO:[-180,0],
+      HHHHN:[-120,0,120], CHHHH:[-180,0,-90,90],
+    };
+    const degs=angMap[key]||(branches.length===2?[-120,120]:branches.length===3?[-120,0,120]:[-180,0,-90,90]);
+    branches.forEach((idx,bi)=>{
+      const ang=(degs[bi]||0)*Math.PI/180;
+      const d=atomDist(els[ci],els[idx]);
+      pos[idx]={x:Math.cos(ang)*d,y:Math.sin(ang)*d};
+    });
+  }
+
+  // ── Canvas ────────────────────────────────────────────────────────────────
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  atoms.forEach((_,i)=>{
+    const r=atomBR(els[i].shells)+10;
+    x0=Math.min(x0,pos[i].x-r); x1=Math.max(x1,pos[i].x+r);
+    y0=Math.min(y0,pos[i].y-r); y1=Math.max(y1,pos[i].y+r);
+  });
+  const PAD=28,CW=x1-x0+PAD*2,CH=y1-y0+PAD*2;
+  const ox=PAD-x0,oy=PAD-y0;
+  const sp=pos.map(p=>({x:p.x+ox,y:p.y+oy}));
+
+  const DPR=window.devicePixelRatio||1;
+  const cv=document.createElement('canvas');
+  cv.width=CW*DPR; cv.height=CH*DPR;
+  cv.style.width=CW+'px'; cv.style.height=CH+'px'; cv.style.maxWidth='100%';
+  const ctx=cv.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  // ── PASS 1: Shell rings ────────────────────────────────────────────────────
+  atoms.forEach((_,i)=>{
+    const p=sp[i],shells=els[i].shells;
+    for(let s=shells.length-1;s>=0;s--){
+      ctx.beginPath(); ctx.arc(p.x,p.y,shellR(shells,s),0,Math.PI*2);
+      ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.28)';
+      ctx.lineWidth=1.5; ctx.stroke();
+    }
+  });
+
+  // ── PASS 2: Nucleus circles ────────────────────────────────────────────────
+  atoms.forEach((sym,i)=>{
+    const p=sp[i],el=els[i];
+    ctx.beginPath(); ctx.arc(p.x,p.y,NUC_R,0,Math.PI*2);
+    ctx.fillStyle=el.fill; ctx.fill();
+    ctx.strokeStyle=el.color; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='#1a1a16';
+    ctx.font=`700 ${sym.length>1?13:15}px 'Pretendard',sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(sym,p.x,p.y);
+  });
+
+  // ── PASS 3: Electron dots ─────────────────────────────────────────────────
+  // For each atom: distribute electrons on each shell.
+  // On the outermost shell, skip the angular zone toward each bond partner.
+  // Special case: H has only 1 electron total, always shared → draw nothing for H.
+  // Inner shells: always draw all electrons uniformly.
+  atoms.forEach((_,i)=>{
+    const p=sp[i],el=els[i],shells=el.shells;
+    // H only has 1 valence electron which is fully shared — skip entirely
+    if(el.sym==='H') return;
+
+    const myBonds=bd.seqs.filter(s=>s.a===i||s.b===i);
+    const EXCL=0.42; // angular exclusion zone around bond direction (~24°)
+
+    for(let s=0;s<shells.length;s++){
+      const r=shellR(shells,s);
+      const ec=shells[s];
+      const isOuter=(s===shells.length-1);
+      const baseRot=s===0?-Math.PI/2: s===1?-Math.PI/2+0.35: -Math.PI/2+0.7;
+
+      for(let e=0;e<ec;e++){
+        const ang=baseRot+(e/ec)*Math.PI*2;
+        const ex=p.x+Math.cos(ang)*r, ey=p.y+Math.sin(ang)*r;
+
+        if(isOuter){
+          let skip=false;
+          for(const bond of myBonds){
+            const partIdx=bond.a===i?bond.b:bond.a;
+            const pp=sp[partIdx];
+            const bondAng=Math.atan2(pp.y-p.y,pp.x-p.x);
+            let diff=ang-bondAng;
+            while(diff>Math.PI)diff-=2*Math.PI;
+            while(diff<-Math.PI)diff+=2*Math.PI;
+            if(Math.abs(diff)<EXCL){skip=true;break;}
+          }
+          if(skip) continue;
+        }
+
+        ctx.beginPath(); ctx.arc(ex,ey,5,0,Math.PI*2);
+        ctx.fillStyle=el.color; ctx.fill();
+        ctx.strokeStyle=BG; ctx.lineWidth=1.5; ctx.stroke();
+      }
+    }
+  });
+
+  // ── PASS 4: Shared pair dots — purple ─────────────────────────────────────
+  bd.seqs.forEach(({a,b,t})=>{
+    const p1=sp[a],p2=sp[b];
+    const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+    const e1=outerR(els[a].shells),e2=outerR(els[b].shells);
+    const overlapMid=(e1+(len-e2))/2;
+    const mx=p1.x+ux*overlapMid,my=p1.y+uy*overlapMid;
+
+    const lineOff=t===1?[0]:t===2?[-7,7]:[-13,0,13];
+    lineOff.forEach(loff=>{
+      const bx=mx+nx*loff,by=my+ny*loff;
+      [-7,7].forEach(d=>{
+        ctx.beginPath(); ctx.arc(bx+ux*d,by+uy*d,5.5,0,Math.PI*2);
+        ctx.fillStyle='#7755cc'; ctx.fill();
+        ctx.strokeStyle=BG; ctx.lineWidth=1.5; ctx.stroke();
+      });
+    });
+  });
+
+  const wrap=document.getElementById('cov-vis-wrap');
+  wrap.innerHTML=''; wrap.style.padding='16px'; wrap.appendChild(cv);
+
+  const types=[...new Set(bd.seqs.map(s=>s.t))];
+  let tags='';
+  if(types.includes(3))tags+=`<span class="bond-tag tag-triple">삼중 결합 (3쌍)</span>`;
+  if(types.includes(2))tags+=`<span class="bond-tag tag-double">이중 결합 (2쌍)</span>`;
+  if(types.includes(1))tags+=`<span class="bond-tag tag-single">단일 결합 (1쌍)</span>`;
+  document.getElementById('cov-result').innerHTML=`<div class="result-box">
+    <div class="formula-big">${bd.formula}${bd.name?' — '+bd.name:''}</div>
+    <div class="bond-tags">${tags}</div>
+    <div class="info-line">${bd.info}</div>
+    <div class="info-line" style="margin-top:6px">총 공유 전자쌍: <strong>${bd.total}쌍</strong></div>
+  </div>`;
+}
+
+function drawDot(ctx,x,y,color,bg){
+  ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);
+  ctx.fillStyle=color;ctx.fill();
+  ctx.strokeStyle=bg;ctx.lineWidth=1.5;ctx.stroke();
+}
+
+// ── IONIC ─────────────────────────────────────────────────────────────────────
+function gcd(a,b){return b===0?a:gcd(b,a%b);}
+function ionShells(el,state){
+  const o=[...el.shells];
+  if(state==='cat'){
+    let rem=el.charge;
+    for(let i=o.length-1;i>=0&&rem>0;i--){const t=Math.min(o[i],rem);o[i]-=t;rem-=t;if(o[i]===0)o.splice(i,1);}
+  } else {
+    o[o.length-1]=Math.min(o[o.length-1]+Math.abs(el.charge),[2,8,8,8][o.length-1]||8);
+  }
+  return o;
+}
+
+function selIon(type,sym){
+  if(type==='cat'){ionCat=sym;document.querySelectorAll('[id^="ic-"]').forEach(b=>b.classList.remove('selected'));document.getElementById('ic-'+sym).classList.add('selected');}
+  else{ionAn=sym;document.querySelectorAll('[id^="ia-"]').forEach(b=>b.classList.remove('selected'));document.getElementById('ia-'+sym).classList.add('selected');}
+  if(ionCat&&ionAn)analyzeIonic();
+}
+function loadIonPreset(cat,an,label){
+  ionCat=cat;ionAn=an;
+  document.querySelectorAll('[id^="ic-"],[id^="ia-"]').forEach(b=>b.classList.remove('selected'));
+  const ci=document.getElementById('ic-'+cat),ai=document.getElementById('ia-'+an);
+  if(ci)ci.classList.add('selected');if(ai)ai.classList.add('selected');
+  document.querySelectorAll('#ion-presets .preset-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ip-'+cat+an).classList.add('active');
+  analyzeIonic();
+}
+function analyzeIonic(){
+  if(!ionCat||!ionAn)return;
+  const cat=ION_CATS[ionCat],an=ION_ANS[ionAn];
+  if(!cat||!an)return;
+  const g=gcd(cat.charge,Math.abs(an.charge));
+  const catN=Math.abs(an.charge)/g,anN=cat.charge/g;
+  drawIonic(cat,an,catN,anN);
+}
+
+function drawIonic(cat,an,catN,anN){
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  // Rule: fewer goes center. catN <= anN → cations center; else anions center
+  const catIsCenter=catN<=anN;
+  const cEL=catIsCenter?cat:an, cN=catIsCenter?catN:anN, cState=catIsCenter?'cat':'an';
+  const oEL=catIsCenter?an:cat, oN=catIsCenter?anN:catN, oState=catIsCenter?'an':'cat';
+
+  const cShells=ionShells(cEL,cState);
+  const oShells=ionShells(oEL,oState);
+  const cBR=atomBR(cShells);
+  const oBR=atomBR(oShells);
+
+  // Layout: left outer ions | center ions | right outer ions
+  const leftN=Math.floor(oN/2),rightN=oN-leftN;
+  const BPAD=16;// bracket padding beyond atom border
+  const SLOT_C=(cBR+BPAD)*2+30;
+  const SLOT_O=(oBR+BPAD)*2+20;
+  const totalW=leftN*SLOT_O+cN*SLOT_C+rightN*SLOT_O+60;
+  const W=Math.max(560,totalW);
+  const H=Math.max(280,Math.max(cBR,oBR)*2+120);
+  const cy=H/2;
+
+  const DPR=window.devicePixelRatio||1;
+  const canvas=document.createElement('canvas');
+  canvas.width=W*DPR;canvas.height=H*DPR;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  canvas.style.maxWidth='100%';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  // Build position list
+  const startX=(W-totalW+60)/2;
+  let curX=startX;
+  const ions=[];
+  for(let i=0;i<leftN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+  for(let i=0;i<cN;i++){ions.push({x:curX+SLOT_C/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
+  for(let i=0;i<rightN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+
+  ions.forEach(({x,el,state,shells,br})=>{
+    const BG=isDark?'#2c2c28':'#f5f3ee';
+    // Shell rings
+    for(let s=shells.length-1;s>=0;s--){
+      ctx.beginPath();ctx.arc(x,cy,shellR(shells,s),0,Math.PI*2);
+      ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.30)';
+      ctx.lineWidth=1.5;ctx.stroke();
+    }
+    // Nucleus
+    ctx.beginPath();ctx.arc(x,cy,NUC_R,0,Math.PI*2);
+    ctx.fillStyle=el.fill;ctx.fill();
+    ctx.strokeStyle=el.color;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle='#1a1a16';
+    ctx.font=`700 ${el.sym.length>1?13:15}px 'Pretendard','Apple SD Gothic Neo',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(el.sym,x,cy);
+    // Electron dots — uniform per shell
+    const rotBase=[-Math.PI/2,-Math.PI/2+0.4,-Math.PI/2+0.8,-Math.PI/2+1.2];
+    for(let s=0;s<shells.length;s++){
+      const r=shellR(shells,s),ec=shells[s];
+      for(let e=0;e<ec;e++){
+        const ang=rotBase[s]+(e/ec)*Math.PI*2;
+        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,cy+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      }
+    }
+    // Bracket
+    const BPAD=16;
+    const lx=x-br-BPAD,rx=x+br+BPAD;
+    const ty=cy-br-BPAD,by2=cy+br+BPAD;
+    const bw=9;
+    const bc=isDark?'rgba(210,208,200,0.85)':'rgba(30,28,22,0.85)';
+    ctx.strokeStyle=bc;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(lx+bw,ty);ctx.lineTo(lx,ty);ctx.lineTo(lx,by2);ctx.lineTo(lx+bw,by2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(rx-bw,ty);ctx.lineTo(rx,ty);ctx.lineTo(rx,by2);ctx.lineTo(rx-bw,by2);ctx.stroke();
+    // Charge label
+    const charge=state==='cat'?`+${el.charge}`:Math.abs(el.charge)>1?`${el.charge}`:'−';
+    ctx.fillStyle=el.color;
+    ctx.font=`700 13px 'Pretendard',sans-serif`;
+    ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.fillText(charge,rx+3,ty+14);
+  });
+
+  const wrap=document.getElementById('ion-vis-wrap');
+  wrap.innerHTML='';wrap.style.padding='16px';wrap.appendChild(canvas);
+
+  function subNum(n){return n>1?n.toString().split('').map(d=>'₀₁₂₃₄₅₆₇₈₉'[+d]).join(''):'';}
+  const formula=cat.sym+subNum(catN)+an.sym+subNum(anN);
+  document.getElementById('ion-result').innerHTML=`<div class="result-box" style="margin-top:12px">
+    <div class="formula-big">${formula}</div>
+    <div class="info-line"><strong>${cat.name}(${cat.sym}⁺${cat.charge>1?cat.charge:''}) : ${an.name}(${an.sym}${an.charge}) = ${catN} : ${anN}</strong></div>
+    <div class="info-line" style="margin-top:6px">${cat.sym}은 전자 ${cat.charge}개를 잃어 +${cat.charge} 이온이 되고, ${an.sym}은 전자 ${Math.abs(an.charge)}개를 얻어 ${an.charge} 이온이 됩니다.</div>
+  </div>`;
+}
+
+
+
+
+// drawCovalentToWrap: same as drawCovalent but draws into a given DOM element
+function drawCovalentToWrap(key, targetWrap){
+  const bd=BOND_DB[key];
+  if(!bd||!bd.seqs.length)return;
+  const atoms=bd.order;
+  const n=atoms.length;
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const els=atoms.map(s=>COV_ELS[s]);
+  const BG=isDark?'#2c2c28':'#f5f3ee';
+
+  function atomDistL(elA,elB){
+    const OV=12;
+    const natural=outerR(elA.shells)+outerR(elB.shells)-OV;
+    const minA=outerR(elA.shells)+NUC_R+8;
+    const minB=outerR(elB.shells)+NUC_R+8;
+    let minInner=0;
+    if(elA.shells.length>=2){const iR=shellR(elA.shells,elA.shells.length-2);minInner=Math.max(minInner,iR+outerR(elB.shells)+10);}
+    if(elB.shells.length>=2){const iR=shellR(elB.shells,elB.shells.length-2);minInner=Math.max(minInner,iR+outerR(elA.shells)+10);}
+    return Math.max(natural,minA,minB,minInner);
+  }
+
+  const ci=n>2?(bd.center!==undefined?bd.center:0):-1;
+  const pos=new Array(n);
+  if(n===1){pos[0]={x:0,y:0};}
+  else if(n===2){
+    const d=atomDistL(els[0],els[1]);
+    pos[0]={x:-d/2,y:0};pos[1]={x:d/2,y:0};
+  } else {
+    pos[ci]={x:0,y:0};
+    const branches=[...Array(n).keys()].filter(i=>i!==ci);
+    const angMap={HHO:[-120,120],OCO:[-180,0],HHHHN:[-120,0,120],CHHHH:[-180,0,-90,90]};
+    const degs=angMap[key]||(branches.length===2?[-120,120]:branches.length===3?[-120,0,120]:[-180,0,-90,90]);
+    branches.forEach(function(idx,bi){
+      const ang=(degs[bi]||0)*Math.PI/180;
+      const d=atomDistL(els[ci],els[idx]);
+      pos[idx]={x:Math.cos(ang)*d,y:Math.sin(ang)*d};
+    });
+  }
+
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  atoms.forEach(function(_,i){
+    const r=atomBR(els[i].shells)+10;
+    x0=Math.min(x0,pos[i].x-r);x1=Math.max(x1,pos[i].x+r);
+    y0=Math.min(y0,pos[i].y-r);y1=Math.max(y1,pos[i].y+r);
+  });
+  const PAD=28,CW=x1-x0+PAD*2,CH=y1-y0+PAD*2;
+  const ox=PAD-x0,oy=PAD-y0;
+  const sp=pos.map(function(p){return{x:p.x+ox,y:p.y+oy};});
+
+  const DPR=window.devicePixelRatio||1;
+  const cv=document.createElement('canvas');
+  cv.width=CW*DPR;cv.height=CH*DPR;
+  cv.style.width=CW+'px';cv.style.height=CH+'px';cv.style.maxWidth='100%';
+  const ctx=cv.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  // Shell rings
+  atoms.forEach(function(_,i){
+    const p=sp[i],shells=els[i].shells;
+    for(let s=shells.length-1;s>=0;s--){
+      ctx.beginPath();ctx.arc(p.x,p.y,shellR(shells,s),0,Math.PI*2);
+      ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.28)';
+      ctx.lineWidth=1.5;ctx.stroke();
+    }
+  });
+  // Nuclei
+  atoms.forEach(function(sym,i){
+    const p=sp[i],el=els[i];
+    ctx.beginPath();ctx.arc(p.x,p.y,NUC_R,0,Math.PI*2);
+    ctx.fillStyle=el.fill;ctx.fill();
+    ctx.strokeStyle=el.color;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle='#1a1a16';
+    ctx.font='700 '+(sym.length>1?13:15)+'px Pretendard,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(sym,p.x,p.y);
+  });
+  // Electron dots
+  atoms.forEach(function(_,i){
+    const p=sp[i],el=els[i],shells=el.shells;
+    if(el.sym==='H')return;
+    const myBonds=bd.seqs.filter(function(s){return s.a===i||s.b===i;});
+    const EXCL=0.42;
+    for(let s=0;s<shells.length;s++){
+      const r=shellR(shells,s),ec=shells[s];
+      const isOuter=(s===shells.length-1);
+      const baseRot=s===0?-Math.PI/2:s===1?-Math.PI/2+0.35:-Math.PI/2+0.7;
+      for(let e=0;e<ec;e++){
+        const ang=baseRot+(e/ec)*Math.PI*2;
+        const ex=p.x+Math.cos(ang)*r,ey=p.y+Math.sin(ang)*r;
+        if(isOuter){
+          let skip=false;
+          for(let bi=0;bi<myBonds.length;bi++){
+            const bond=myBonds[bi];
+            const partIdx=bond.a===i?bond.b:bond.a;
+            const pp=sp[partIdx];
+            const bondAng=Math.atan2(pp.y-p.y,pp.x-p.x);
+            let diff=ang-bondAng;
+            while(diff>Math.PI)diff-=2*Math.PI;
+            while(diff<-Math.PI)diff+=2*Math.PI;
+            if(Math.abs(diff)<EXCL){skip=true;break;}
+          }
+          if(skip)continue;
+        }
+        ctx.beginPath();ctx.arc(ex,ey,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      }
+    }
+  });
+  // Shared pair dots (purple)
+  bd.seqs.forEach(function(seq){
+    const a=seq.a,b=seq.b,t=seq.t;
+    const p1=sp[a],p2=sp[b];
+    const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+    const e1=outerR(els[a].shells),e2=outerR(els[b].shells);
+    const mid=(e1+(len-e2))/2;
+    const mx=p1.x+ux*mid,my=p1.y+uy*mid;
+    const lineOff=t===1?[0]:t===2?[-7,7]:[-13,0,13];
+    lineOff.forEach(function(loff){
+      const bx=mx+nx*loff,by=my+ny*loff;
+      [-7,7].forEach(function(d){
+        ctx.beginPath();ctx.arc(bx+ux*d,by+uy*d,5.5,0,Math.PI*2);
+        ctx.fillStyle='#7755cc';ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      });
+    });
+  });
+
+  targetWrap.appendChild(cv);
+}
+
+// ── QUIZ ──────────────────────────────────────────────────────────────────────
+const QUIZ_KEYS=['HH','FF','ClCl','FH','ClH','HHO','OO','NN','OCO','CHHHH','HHHHN'];
+let quizQueue=[],quizIdx=0,quizScore=0,quizAnswered=false;
+
+function shuffled(arr){return [...arr].sort(()=>Math.random()-0.5);}
+
+function startQuiz(){
+  quizQueue=shuffled(QUIZ_KEYS);
+  quizIdx=0; quizScore=0; quizAnswered=false;
+  document.getElementById('quiz-score').textContent='0';
+  document.getElementById('quiz-feedback').textContent='';
+  document.getElementById('quiz-next-btn').style.display='none';
+  document.getElementById('quiz-result-btn').style.display='none';
+  renderQuizQuestion();
+}
+
+function renderQuizQuestion(){
+  if(quizIdx>=quizQueue.length){showQuizResult();return;}
+  const key=quizQueue[quizIdx];
+  quizAnswered=false;
+  document.getElementById('quiz-counter').textContent='문제 '+(quizIdx+1)+' / '+quizQueue.length;
+  document.getElementById('quiz-progress').style.width=((quizIdx/quizQueue.length)*100)+'%';
+  document.getElementById('quiz-feedback').textContent='';
+  document.getElementById('quiz-next-btn').style.display='none';
+  document.getElementById('quiz-result-btn').style.display='none';
+
+  // Draw molecule directly into quiz-vis using drawCovalentToWrap
+  const qWrap=document.getElementById('quiz-vis');
+  qWrap.innerHTML=''; qWrap.style.padding='16px';
+  drawCovalentToWrap(key, qWrap);
+
+  // Build 4 choices
+  const others=shuffled(QUIZ_KEYS.filter(k=>k!==key)).slice(0,3);
+  const choices=shuffled([key,...others]);
+  const container=document.getElementById('quiz-choices');
+  container.innerHTML='';
+  choices.forEach(function(k){
+    const bd=BOND_DB[k];
+    const btn=document.createElement('button');
+    btn.className='choice-btn';
+    btn.textContent=bd.formula+' ('+bd.name+')';
+    btn.dataset.key=k;
+    btn.addEventListener('click',function(){checkAnswer(k,key);});
+    container.appendChild(btn);
+  });
+}
+
+function checkAnswer(chosen,correct){
+  if(quizAnswered)return;
+  quizAnswered=true;
+  const btns=document.querySelectorAll('.choice-btn');
+  btns.forEach(b=>b.disabled=true);
+  const ok=(chosen===correct);
+  if(ok){
+    quizScore++;
+    document.getElementById('quiz-score').textContent=quizScore;
+    document.getElementById('quiz-feedback').innerHTML='<span style="color:#0F6E56">✓ 정답! '+BOND_DB[correct].formula+' — '+BOND_DB[correct].name+'</span>';
+  } else {
+    document.getElementById('quiz-feedback').innerHTML='<span style="color:#993C1D">✗ 오답. 정답은 '+BOND_DB[correct].formula+' — '+BOND_DB[correct].name+'</span>';
+  }
+  btns.forEach(function(b){
+    if(b.dataset.key===correct) b.classList.add('correct');
+    else if(b.dataset.key===chosen && !ok) b.classList.add('wrong');
+  });
+  if(quizIdx>=quizQueue.length-1){
+    document.getElementById('quiz-result-btn').style.display='inline-block';
+  } else {
+    document.getElementById('quiz-next-btn').style.display='inline-block';
+  }
+}
+
+function nextQuiz(){
+  quizIdx++;
+  renderQuizQuestion();
+}
+
+function showQuizResult(){
+  document.getElementById('quiz-progress').style.width='100%';
+  document.getElementById('quiz-counter').textContent='퀴즈 완료!';
+  const msg=quizScore>=9?'🎉 완벽해요!':quizScore>=6?'👍 잘했어요!':'💪 다시 도전해보세요!';
+  document.getElementById('quiz-vis').innerHTML=
+    '<div style="text-align:center;padding:40px 20px;">'
+    +'<div style="font-size:52px;font-weight:700;color:var(--text);margin-bottom:8px;">'+quizScore+' / '+quizQueue.length+'</div>'
+    +'<div style="font-size:16px;color:var(--text2);margin-bottom:28px;">'+msg+'</div>'
+    +'<button class="btn-analyze" onclick="startQuiz()">다시 풀기</button>'
+    +'</div>';
+  document.getElementById('quiz-choices').innerHTML='';
+  document.getElementById('quiz-feedback').textContent='';
+  document.getElementById('quiz-next-btn').style.display='none';
+  document.getElementById('quiz-result-btn').style.display='none';
+}
+
+function switchTab(type){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  if(type==='covalent'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('sec-covalent').classList.add('active');}
+  else if(type==='ionic'){document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('sec-ionic').classList.add('active');}
+  else{document.querySelectorAll('.tab')[2].classList.add('active');document.getElementById('sec-quiz').classList.add('active');startQuiz();}
+}
+init();
+</script>
+</body>
+</html>
