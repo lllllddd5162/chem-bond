@@ -547,7 +547,7 @@ function drawIonic(cat,an,catN,anN){
   const SLOT_O=(oBR+BPAD)*2+20;
   const totalW=leftN*SLOT_O+cN*SLOT_C+rightN*SLOT_O+60;
   const W=Math.max(560,totalW);
-  const H=Math.max(280,Math.max(cBR,oBR)*2+120);
+  const H=Math.max(280,Math.max(cBR,oBR)*2+(cN===1&&oN===3?SLOT_O*1.8+oBR*2:120));
   const cy=H/2;
 
   const DPR=window.devicePixelRatio||1;
@@ -558,37 +558,62 @@ function drawIonic(cat,an,catN,anN){
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
 
-  // Build position list
-  const startX=(W-totalW+60)/2;
-  let curX=startX;
+  // Build position list with 2D layout support
+  // Special case: 1 center + 3 outer → center in middle, outer at left/right/bottom
   const ions=[];
-  for(let i=0;i<leftN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
-  for(let i=0;i<cN;i++){ions.push({x:curX+SLOT_C/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
-  for(let i=0;i<rightN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+  if(cN===1&&oN===3){
+    // 2D layout: L C R with one below C, vertically centered
+    const cx=W/2;
+    const rowGap=SLOT_O*0.8;
+    const totalH=(oBR+cBR)+rowGap;
+    const topY=H/2-totalH/2+cBR;
+    const botY=topY+rowGap;
+    const dist=SLOT_C/2+SLOT_O/2;
+    ions.push({x:cx-dist, y:topY, el:oEL,state:oState,shells:oShells,br:oBR});
+    ions.push({x:cx,      y:topY, el:cEL,state:cState,shells:cShells,br:cBR});
+    ions.push({x:cx+dist, y:topY, el:oEL,state:oState,shells:oShells,br:oBR});
+    ions.push({x:cx,      y:botY, el:oEL,state:oState,shells:oShells,br:oBR});
+  } else {
+    // Default: interleaved horizontal row
+    const seq=[];let ci2=0,oi2=0;
+    if(oN>=cN){
+      while(ci2<cN||oi2<oN){if(oi2<oN){seq.push('o');oi2++;}if(ci2<cN){seq.push('c');ci2++;}}
+    } else {
+      while(ci2<cN||oi2<oN){if(ci2<cN){seq.push('c');ci2++;}if(oi2<oN){seq.push('o');oi2++;}}
+    }
+    const totalW2=seq.reduce((s,t)=>s+(t==='c'?SLOT_C:SLOT_O),0);
+    const startX=(W-totalW2)/2;
+    let curX=startX;
+    seq.forEach(function(t){
+      if(t==='o'){ions.push({x:curX+SLOT_O/2,y:H/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+      else{ions.push({x:curX+SLOT_C/2,y:H/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
+    });
+  }
 
-  ions.forEach(({x,el,state,shells,br})=>{
+  ions.forEach(({x,y,el,state,shells,br})=>{
+    const iy=y!==undefined?y:cy;
     const BG=isDark?'#2c2c28':'#f5f3ee';
     // Shell rings
     for(let s=shells.length-1;s>=0;s--){
-      ctx.beginPath();ctx.arc(x,cy,shellR(shells,s),0,Math.PI*2);
+      ctx.beginPath();ctx.arc(x,iy,shellR(shells,s),0,Math.PI*2);
       ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.30)';
       ctx.lineWidth=1.5;ctx.stroke();
     }
     // Nucleus
-    ctx.beginPath();ctx.arc(x,cy,NUC_R,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(x,iy,NUC_R,0,Math.PI*2);
     ctx.fillStyle=el.fill;ctx.fill();
     ctx.strokeStyle=el.color;ctx.lineWidth=2.5;ctx.stroke();
     ctx.fillStyle='#1a1a16';
     ctx.font=`700 ${el.sym.length>1?13:15}px 'Pretendard','Apple SD Gothic Neo',sans-serif`;
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(el.sym,x,cy);
+    ctx.fillText(el.sym,x,iy);
     // Electron dots — uniform per shell
     const rotBase=[-Math.PI/2,-Math.PI/2+0.4,-Math.PI/2+0.8,-Math.PI/2+1.2];
     for(let s=0;s<shells.length;s++){
       const r=shellR(shells,s),ec=shells[s];
       for(let e=0;e<ec;e++){
         const ang=rotBase[s]+(e/ec)*Math.PI*2;
-        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,cy+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,iy+Math.sin(ang)*r,5,0,Math.PI*2);
         ctx.fillStyle=el.color;ctx.fill();
         ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
       }
@@ -596,7 +621,7 @@ function drawIonic(cat,an,catN,anN){
     // Bracket
     const BPAD=16;
     const lx=x-br-BPAD,rx=x+br+BPAD;
-    const ty=cy-br-BPAD,by2=cy+br+BPAD;
+    const ty=iy-br-BPAD,by2=iy+br+BPAD;
     const bw=9;
     const bc=isDark?'rgba(210,208,200,0.85)':'rgba(30,28,22,0.85)';
     ctx.strokeStyle=bc;ctx.lineWidth=2.5;
@@ -939,38 +964,61 @@ function drawIonicToWrap(catSym,anSym,targetWrap,hideSymbols){
   ctx.scale(DPR,DPR);
   const BG=isDark?'#2c2c28':'#f5f3ee';
 
-  const startX=(W-totalW+60)/2;
-  let curX=startX;
+  const seq2=[];let ci3=0,oi3=0;
   const ions=[];
-  for(let i=0;i<leftN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
-  for(let i=0;i<cN;i++){ions.push({x:curX+SLOT_C/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
-  for(let i=0;i<rightN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+  if(cN===1&&oN===3){
+    const cx=W/2;
+    const rowGap=SLOT_O*0.8;
+    const totalH=(oBR+cBR)+rowGap;
+    const topY=H/2-totalH/2+cBR;
+    const botY=topY+rowGap;
+    const dist=SLOT_C/2+SLOT_O/2;
+    ions.push({x:cx-dist,y:topY,el:oEL,state:oState,shells:oShells,br:oBR});
+    ions.push({x:cx,     y:topY,el:cEL,state:cState,shells:cShells,br:cBR});
+    ions.push({x:cx+dist,y:topY,el:oEL,state:oState,shells:oShells,br:oBR});
+    ions.push({x:cx,     y:botY,el:oEL,state:oState,shells:oShells,br:oBR});
+  } else {
+    if(oN>=cN){
+      while(ci3<cN||oi3<oN){seq2.push(oi3<oN?'o':'c');if(seq2[seq2.length-1]==='o')oi3++;else ci3++;
+        if(ci3<cN&&seq2[seq2.length-1]==='o'){seq2.push('c');ci3++;}}
+    } else {
+      while(ci3<cN||oi3<oN){seq2.push(ci3<cN?'c':'o');if(seq2[seq2.length-1]==='c')ci3++;else oi3++;
+        if(oi3<oN&&seq2[seq2.length-1]==='c'){seq2.push('o');oi3++;}}
+    }
+    const totalW2=seq2.reduce(function(s,t){return s+(t==='c'?SLOT_C:SLOT_O);},0);
+    const startX=(W-totalW2)/2;
+    let curX=startX;
+    seq2.forEach(function(t){
+      if(t==='o'){ions.push({x:curX+SLOT_O/2,y:H/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+      else{ions.push({x:curX+SLOT_C/2,y:H/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
+    });
+  }
 
   ions.forEach(function(ion){
-    const x=ion.x,el=ion.el,state=ion.state,shells=ion.shells,br=ion.br;
+    const x=ion.x,iy=ion.y!==undefined?ion.y:cy,el=ion.el,state=ion.state,shells=ion.shells,br=ion.br;
     for(let s=shells.length-1;s>=0;s--){
-      ctx.beginPath();ctx.arc(x,cy,shellR(shells,s),0,Math.PI*2);
+      ctx.beginPath();ctx.arc(x,iy,shellR(shells,s),0,Math.PI*2);
       ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.30)';
       ctx.lineWidth=1.5;ctx.stroke();
     }
-    ctx.beginPath();ctx.arc(x,cy,NUC_R,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(x,iy,NUC_R,0,Math.PI*2);
     ctx.fillStyle=hideSymbols?'#cccccc':el.fill;ctx.fill();
     ctx.strokeStyle=hideSymbols?'#aaaaaa':el.color;ctx.lineWidth=2.5;ctx.stroke();
     ctx.fillStyle=hideSymbols?'#888888':'#1a1a16';
     ctx.font='700 '+(hideSymbols?14:(el.sym.length>1?13:15))+'px Pretendard,sans-serif';
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(hideSymbols?'?':el.sym,x,cy);
+    ctx.fillText(hideSymbols?'?':el.sym,x,iy);
     const rotBase=[-Math.PI/2,-Math.PI/2+0.4,-Math.PI/2+0.8,-Math.PI/2+1.2];
     for(let s=0;s<shells.length;s++){
       const r=shellR(shells,s),ec=shells[s];
       for(let e=0;e<ec;e++){
         const ang=rotBase[s]+(e/ec)*Math.PI*2;
-        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,cy+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,iy+Math.sin(ang)*r,5,0,Math.PI*2);
         ctx.fillStyle=el.color;ctx.fill();
         ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
       }
     }
-    const lx=x-br-BPAD,rx=x+br+BPAD,ty=cy-br-BPAD,by2=cy+br+BPAD,bw=9;
+    const lx=x-br-BPAD,rx=x+br+BPAD,ty=iy-br-BPAD,by2=iy+br+BPAD,bw=9;
     const bc=isDark?'rgba(210,208,200,0.85)':'rgba(30,28,22,0.85)';
     ctx.strokeStyle=bc;ctx.lineWidth=2.5;
     ctx.beginPath();ctx.moveTo(lx+bw,ty);ctx.lineTo(lx,ty);ctx.lineTo(lx,by2);ctx.lineTo(lx+bw,by2);ctx.stroke();
@@ -978,6 +1026,12 @@ function drawIonicToWrap(catSym,anSym,targetWrap,hideSymbols){
     if(!hideSymbols){
       const charge=state==='cat'?'+'+el.charge:(Math.abs(el.charge)>1?el.charge:'−');
       ctx.fillStyle=el.color;ctx.font='700 13px Pretendard,sans-serif';
+      ctx.textAlign='left';ctx.textBaseline='alphabetic';
+      ctx.fillText(charge,rx+3,ty+14);
+    } else {
+      // In quiz mode: still show the charge so students can deduce the ratio
+      const charge=state==='cat'?'+'+el.charge:(Math.abs(el.charge)>1?el.charge+'−':'−');
+      ctx.fillStyle='#888888';ctx.font='700 13px Pretendard,sans-serif';
       ctx.textAlign='left';ctx.textBaseline='alphabetic';
       ctx.fillText(charge,rx+3,ty+14);
     }
