@@ -134,6 +134,7 @@
       <div class="vis-area" id="ion-vis-wrap"><div class="vis-placeholder">양이온 + 음이온 원소를 각각 선택하세요</div></div>
       <div id="ion-result"></div>
     </div>
+  </div>
   <!-- QUIZ -->
   <div class="section" id="sec-quiz">
     <div class="panel">
@@ -406,25 +407,46 @@ function drawCovalent(key){
       }
     }
 
-    // Outer shell — only lone electrons, placed AWAY from bond partners
+    // Outer shell — lone electron PAIRS placed in angular gaps between bond directions
     if(loneCount>0){
       const vr=shellR(shells,shells.length-1);
-      // Compute average bond direction, place lone electrons on opposite side
-      let awx=0,awy=0;
-      myBonds.forEach(bond=>{
+      // Collect bond angles sorted
+      const bondAngs=myBonds.map(bond=>{
         const partIdx=bond.a===i?bond.b:bond.a;
-        awx-=(sp[partIdx].x-p.x); awy-=(sp[partIdx].y-p.y);
+        return Math.atan2(sp[partIdx].y-p.y, sp[partIdx].x-p.x);
+      }).sort((a,b)=>a-b);
+      // Compute midpoint angles between consecutive bonds = gap positions
+      const gapAngs=bondAngs.map((a,gi)=>{
+        const next=bondAngs[(gi+1)%bondAngs.length];
+        let diff=next-a; if(diff<=0)diff+=Math.PI*2;
+        return a+diff/2;
       });
-      const awLen=Math.sqrt(awx*awx+awy*awy);
-      const awAng=awLen>0?Math.atan2(awy/awLen,awx/awLen):Math.PI/2;
-      // Spread lone electrons evenly around the away direction
-      const spread=loneCount>1?Math.PI*0.7:0;
-      for(let le=0;le<loneCount;le++){
-        const ang=awAng+(loneCount>1?(le/(loneCount-1)-0.5)*spread:0);
-        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*vr,p.y+Math.sin(ang)*vr,5,0,Math.PI*2);
-        ctx.fillStyle=el.color;ctx.fill();
-        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      if(bondAngs.length===1) gapAngs[0]=bondAngs[0]+Math.PI;
+      // pairCount = total lone pairs
+      const pairCount=Math.round(loneCount/2);
+      // Distribute pairs: fill gaps first, then evenly space remaining around shell
+      const allPairAngs=[];
+      if(pairCount<=gapAngs.length){
+        for(let g=0;g<pairCount;g++) allPairAngs.push(gapAngs[g]);
+      } else {
+        // More pairs than gaps: spread in a 160° arc on the opposite side of the bond average
+        let sumBx=0,sumBy=0;
+        bondAngs.forEach(a=>{sumBx+=Math.cos(a);sumBy+=Math.sin(a);});
+        const oppAng=Math.atan2(sumBy,sumBx)+Math.PI;
+        const arcSpread=pairCount>1?(Math.PI*0.85)/(pairCount-1):0;
+        for(let p2=0;p2<pairCount;p2++){
+          const offset=pairCount>1?(p2-(pairCount-1)/2)*arcSpread:0;
+          allPairAngs.push(oppAng+offset);
+        }
       }
+      const off=0.15;
+      allPairAngs.forEach(ang=>{
+        [ang-off,ang+off].forEach(a=>{
+          ctx.beginPath();ctx.arc(p.x+Math.cos(a)*vr,p.y+Math.sin(a)*vr,5,0,Math.PI*2);
+          ctx.fillStyle=el.color;ctx.fill();
+          ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+        });
+      });
     }
   });
 
@@ -604,7 +626,7 @@ function drawIonic(cat,an,catN,anN){
 
 
 // drawCovalentToWrap: same as drawCovalent but draws into a given DOM element
-function drawCovalentToWrap(key, targetWrap){
+function drawCovalentToWrap(key, targetWrap, hideSymbols){
   const bd=BOND_DB[key];
   if(!bd||!bd.seqs.length)return;
   const atoms=bd.order;
@@ -672,12 +694,19 @@ function drawCovalentToWrap(key, targetWrap){
   atoms.forEach(function(sym,i){
     const p=sp[i],el=els[i];
     ctx.beginPath();ctx.arc(p.x,p.y,NUC_R,0,Math.PI*2);
-    ctx.fillStyle=el.fill;ctx.fill();
-    ctx.strokeStyle=el.color;ctx.lineWidth=2.5;ctx.stroke();
-    ctx.fillStyle='#1a1a16';
-    ctx.font='700 '+(sym.length>1?13:15)+'px Pretendard,sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(sym,p.x,p.y);
+    ctx.fillStyle=hideSymbols?'#cccccc':el.fill;ctx.fill();
+    ctx.strokeStyle=hideSymbols?'#aaaaaa':el.color;ctx.lineWidth=2.5;ctx.stroke();
+    if(!hideSymbols){
+      ctx.fillStyle='#1a1a16';
+      ctx.font='700 '+(sym.length>1?13:15)+'px Pretendard,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(sym,p.x,p.y);
+    } else {
+      ctx.fillStyle='#888888';
+      ctx.font='700 14px Pretendard,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('?',p.x,p.y);
+    }
   });
   // Electron dots — inner shells all, outer shell lone pairs only
   atoms.forEach(function(_,i){
@@ -697,23 +726,41 @@ function drawCovalentToWrap(key, targetWrap){
         ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
       }
     }
-    // Outer shell — lone electrons only, placed away from bonds
+    // Outer shell — lone electron PAIRS in angular gaps between bond directions
     if(loneCount>0){
       const vr=shellR(shells,shells.length-1);
-      let awx=0,awy=0;
-      myBonds.forEach(function(bond){
+      const bondAngs=myBonds.map(function(bond){
         const partIdx=bond.a===i?bond.b:bond.a;
-        awx-=(sp[partIdx].x-p.x); awy-=(sp[partIdx].y-p.y);
+        return Math.atan2(sp[partIdx].y-p.y,sp[partIdx].x-p.x);
+      }).sort(function(a,b){return a-b;});
+      const gapAngs=bondAngs.map(function(a,gi){
+        const next=bondAngs[(gi+1)%bondAngs.length];
+        let diff=next-a; if(diff<=0)diff+=Math.PI*2;
+        return a+diff/2;
       });
-      const awLen=Math.sqrt(awx*awx+awy*awy);
-      const awAng=awLen>0?Math.atan2(awy/awLen,awx/awLen):Math.PI/2;
-      const spread=loneCount>1?Math.PI*0.7:0;
-      for(let le=0;le<loneCount;le++){
-        const ang=awAng+(loneCount>1?(le/(loneCount-1)-0.5)*spread:0);
-        ctx.beginPath();ctx.arc(p.x+Math.cos(ang)*vr,p.y+Math.sin(ang)*vr,5,0,Math.PI*2);
-        ctx.fillStyle=el.color;ctx.fill();
-        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      if(bondAngs.length===1) gapAngs[0]=bondAngs[0]+Math.PI;
+      const pairCount=Math.round(loneCount/2);
+      const allPairAngs=[];
+      if(pairCount<=gapAngs.length){
+        for(let g=0;g<pairCount;g++) allPairAngs.push(gapAngs[g]);
+      } else {
+        let sumBx=0,sumBy=0;
+        bondAngs.forEach(function(a){sumBx+=Math.cos(a);sumBy+=Math.sin(a);});
+        const oppAng=Math.atan2(sumBy,sumBx)+Math.PI;
+        const arcSpread=pairCount>1?(Math.PI*0.85)/(pairCount-1):0;
+        for(let p2=0;p2<pairCount;p2++){
+          const offset=pairCount>1?(p2-(pairCount-1)/2)*arcSpread:0;
+          allPairAngs.push(oppAng+offset);
+        }
       }
+      const off=0.15;
+      allPairAngs.forEach(function(ang){
+        [ang-off,ang+off].forEach(function(a){
+          ctx.beginPath();ctx.arc(p.x+Math.cos(a)*vr,p.y+Math.sin(a)*vr,5,0,Math.PI*2);
+          ctx.fillStyle=el.color;ctx.fill();
+          ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+        });
+      });
     }
   });
   // Shared pair dots (purple)
@@ -768,7 +815,7 @@ function renderQuizQuestion(){
   // Draw molecule directly into quiz-vis using drawCovalentToWrap
   const qWrap=document.getElementById('quiz-vis');
   qWrap.innerHTML=''; qWrap.style.padding='16px';
-  drawCovalentToWrap(key, qWrap);
+  drawCovalentToWrap(key, qWrap, true);
 
   // Build 4 choices
   const others=shuffled(QUIZ_KEYS.filter(k=>k!==key)).slice(0,3);
