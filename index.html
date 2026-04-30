@@ -787,14 +787,35 @@ function drawCovalentToWrap(key, targetWrap, hideSymbols){
 }
 
 // ── QUIZ ──────────────────────────────────────────────────────────────────────
-const QUIZ_KEYS=['HH','FF','ClCl','FH','ClH','HHO','OO','NN','OCO','CHHHH','HHHHN'];
+const QUIZ_COV=['HH','FF','ClCl','FH','ClH','HHO','OO','NN','OCO','CHHHH','HHHHN'];
+const QUIZ_ION=[
+  {cat:'Na',an:'Cl',formula:'NaCl',name:'염화나트륨'},
+  {cat:'K', an:'Cl',formula:'KCl', name:'염화칼륨'},
+  {cat:'Li',an:'F', formula:'LiF', name:'플루오린화리튬'},
+  {cat:'Mg',an:'Cl',formula:'MgCl₂',name:'염화마그네슘'},
+  {cat:'Ca',an:'Cl',formula:'CaCl₂',name:'염화칼슘'},
+  {cat:'Al',an:'Cl',formula:'AlCl₃',name:'염화알루미늄'},
+  {cat:'Mg',an:'O', formula:'MgO', name:'산화마그네슘'},
+  {cat:'Ca',an:'O', formula:'CaO', name:'산화칼슘'},
+  {cat:'Al',an:'O', formula:'Al₂O₃',name:'산화알루미늄'},
+  {cat:'Na',an:'F', formula:'NaF', name:'플루오린화나트륨'},
+  {cat:'Mg',an:'F', formula:'MgF₂',name:'플루오린화마그네슘'},
+];
+
+// Each quiz item: {type:'cov',key} or {type:'ion',idx}
 let quizQueue=[],quizIdx=0,quizScore=0,quizAnswered=false;
 
 function shuffled(arr){return [...arr].sort(()=>Math.random()-0.5);}
 
+function buildQuizQueue(){
+  const covItems=QUIZ_COV.map(k=>({type:'cov',key:k}));
+  const ionItems=QUIZ_ION.map((o,i)=>({type:'ion',idx:i}));
+  return shuffled([...covItems,...ionItems]);
+}
+
 function startQuiz(){
-  quizQueue=shuffled(QUIZ_KEYS);
-  quizIdx=0; quizScore=0; quizAnswered=false;
+  quizQueue=buildQuizQueue();
+  quizIdx=0;quizScore=0;quizAnswered=false;
   document.getElementById('quiz-score').textContent='0';
   document.getElementById('quiz-feedback').textContent='';
   document.getElementById('quiz-next-btn').style.display='none';
@@ -802,9 +823,14 @@ function startQuiz(){
   renderQuizQuestion();
 }
 
+function getQuizLabel(item){
+  if(item.type==='cov'){const bd=BOND_DB[item.key];return bd.formula+' ('+bd.name+')';}
+  const o=QUIZ_ION[item.idx];return o.formula+' ('+o.name+')';
+}
+
 function renderQuizQuestion(){
   if(quizIdx>=quizQueue.length){showQuizResult();return;}
-  const key=quizQueue[quizIdx];
+  const item=quizQueue[quizIdx];
   quizAnswered=false;
   document.getElementById('quiz-counter').textContent='문제 '+(quizIdx+1)+' / '+quizQueue.length;
   document.getElementById('quiz-progress').style.width=((quizIdx/quizQueue.length)*100)+'%';
@@ -812,43 +838,55 @@ function renderQuizQuestion(){
   document.getElementById('quiz-next-btn').style.display='none';
   document.getElementById('quiz-result-btn').style.display='none';
 
-  // Draw molecule directly into quiz-vis using drawCovalentToWrap
   const qWrap=document.getElementById('quiz-vis');
-  qWrap.innerHTML=''; qWrap.style.padding='16px';
-  drawCovalentToWrap(key, qWrap, true);
+  qWrap.innerHTML='';qWrap.style.padding='16px';
 
-  // Build 4 choices
-  const others=shuffled(QUIZ_KEYS.filter(k=>k!==key)).slice(0,3);
-  const choices=shuffled([key,...others]);
+  if(item.type==='cov'){
+    drawCovalentToWrap(item.key,qWrap,true);
+  } else {
+    const o=QUIZ_ION[item.idx];
+    drawIonicToWrap(o.cat,o.an,qWrap,true);
+  }
+
+  // 4 choices: 1 correct + 3 wrong (same type mixed ok)
+  const allItems=quizQueue;
+  const wrongPool=shuffled(allItems.filter((_,i)=>i!==quizIdx)).slice(0,3);
+  const choices=shuffled([item,...wrongPool]);
   const container=document.getElementById('quiz-choices');
   container.innerHTML='';
-  choices.forEach(function(k){
-    const bd=BOND_DB[k];
+  choices.forEach(function(ch,ci){
     const btn=document.createElement('button');
     btn.className='choice-btn';
-    btn.textContent=bd.formula+' ('+bd.name+')';
-    btn.dataset.key=k;
-    btn.addEventListener('click',function(){checkAnswer(k,key);});
+    btn.textContent=getQuizLabel(ch);
+    btn.dataset.ci=ci;
+    btn.addEventListener('click',function(){checkAnswer(ci,choices,item);});
     container.appendChild(btn);
   });
 }
 
-function checkAnswer(chosen,correct){
+function checkAnswer(chosenIdx,choices,correct){
   if(quizAnswered)return;
   quizAnswered=true;
   const btns=document.querySelectorAll('.choice-btn');
   btns.forEach(b=>b.disabled=true);
-  const ok=(chosen===correct);
+  // Find which index is the correct answer
+  const correctIdx=choices.findIndex(function(ch){
+    if(ch.type!==correct.type)return false;
+    if(ch.type==='cov')return ch.key===correct.key;
+    return ch.idx===correct.idx;
+  });
+  const ok=(chosenIdx===correctIdx);
   if(ok){
     quizScore++;
     document.getElementById('quiz-score').textContent=quizScore;
-    document.getElementById('quiz-feedback').innerHTML='<span style="color:#0F6E56">✓ 정답! '+BOND_DB[correct].formula+' — '+BOND_DB[correct].name+'</span>';
+    document.getElementById('quiz-feedback').innerHTML='<span style="color:#0F6E56">✓ 정답! '+getQuizLabel(correct)+'</span>';
   } else {
-    document.getElementById('quiz-feedback').innerHTML='<span style="color:#993C1D">✗ 오답. 정답은 '+BOND_DB[correct].formula+' — '+BOND_DB[correct].name+'</span>';
+    document.getElementById('quiz-feedback').innerHTML='<span style="color:#993C1D">✗ 오답. 정답은 '+getQuizLabel(correct)+'</span>';
   }
   btns.forEach(function(b){
-    if(b.dataset.key===correct) b.classList.add('correct');
-    else if(b.dataset.key===chosen && !ok) b.classList.add('wrong');
+    const ci=parseInt(b.dataset.ci);
+    if(ci===correctIdx)b.classList.add('correct');
+    else if(ci===chosenIdx&&!ok)b.classList.add('wrong');
   });
   if(quizIdx>=quizQueue.length-1){
     document.getElementById('quiz-result-btn').style.display='inline-block';
@@ -856,6 +894,97 @@ function checkAnswer(chosen,correct){
     document.getElementById('quiz-next-btn').style.display='inline-block';
   }
 }
+
+function nextQuiz(){quizIdx++;renderQuizQuestion();}
+
+function showQuizResult(){
+  document.getElementById('quiz-progress').style.width='100%';
+  document.getElementById('quiz-counter').textContent='퀴즈 완료!';
+  const msg=quizScore>=20?'🎉 완벽해요!':quizScore>=14?'👍 잘했어요!':'💪 다시 도전해보세요!';
+  document.getElementById('quiz-vis').innerHTML=
+    '<div style="text-align:center;padding:40px 20px;">'
+    +'<div style="font-size:52px;font-weight:700;color:var(--text);margin-bottom:8px;">'+quizScore+' / '+quizQueue.length+'</div>'
+    +'<div style="font-size:16px;color:var(--text2);margin-bottom:28px;">'+msg+'</div>'
+    +'<button class="btn-analyze" onclick="startQuiz()">다시 풀기</button>'
+    +'</div>';
+  document.getElementById('quiz-choices').innerHTML='';
+  document.getElementById('quiz-feedback').textContent='';
+  document.getElementById('quiz-next-btn').style.display='none';
+  document.getElementById('quiz-result-btn').style.display='none';
+}
+
+// drawIonicToWrap: draws ionic compound into a target element
+function drawIonicToWrap(catSym,anSym,targetWrap,hideSymbols){
+  const cat=ION_CATS[catSym],an=ION_ANS[anSym];
+  if(!cat||!an)return;
+  const g=gcd(cat.charge,Math.abs(an.charge));
+  const catN=Math.abs(an.charge)/g,anN=cat.charge/g;
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+
+  const catIsCenter=catN<=anN;
+  const cEL=catIsCenter?cat:an,cN=catIsCenter?catN:anN,cState=catIsCenter?'cat':'an';
+  const oEL=catIsCenter?an:cat,oN=catIsCenter?anN:catN,oState=catIsCenter?'an':'cat';
+  const cShells=ionShells(cEL,cState),oShells=ionShells(oEL,oState);
+  const cBR=atomBR(cShells),oBR=atomBR(oShells);
+  const leftN=Math.floor(oN/2),rightN=oN-leftN;
+  const BPAD=16,SLOT_C=(cBR+BPAD)*2+30,SLOT_O=(oBR+BPAD)*2+20;
+  const totalW=leftN*SLOT_O+cN*SLOT_C+rightN*SLOT_O+60;
+  const W=Math.max(560,totalW),H=Math.max(280,Math.max(cBR,oBR)*2+120),cy=H/2;
+
+  const DPR=window.devicePixelRatio||1;
+  const canvas=document.createElement('canvas');
+  canvas.width=W*DPR;canvas.height=H*DPR;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';canvas.style.maxWidth='100%';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+  const BG=isDark?'#2c2c28':'#f5f3ee';
+
+  const startX=(W-totalW+60)/2;
+  let curX=startX;
+  const ions=[];
+  for(let i=0;i<leftN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+  for(let i=0;i<cN;i++){ions.push({x:curX+SLOT_C/2,el:cEL,state:cState,shells:cShells,br:cBR});curX+=SLOT_C;}
+  for(let i=0;i<rightN;i++){ions.push({x:curX+SLOT_O/2,el:oEL,state:oState,shells:oShells,br:oBR});curX+=SLOT_O;}
+
+  ions.forEach(function(ion){
+    const x=ion.x,el=ion.el,state=ion.state,shells=ion.shells,br=ion.br;
+    for(let s=shells.length-1;s>=0;s--){
+      ctx.beginPath();ctx.arc(x,cy,shellR(shells,s),0,Math.PI*2);
+      ctx.strokeStyle=isDark?'rgba(200,198,190,0.35)':'rgba(90,88,80,0.30)';
+      ctx.lineWidth=1.5;ctx.stroke();
+    }
+    ctx.beginPath();ctx.arc(x,cy,NUC_R,0,Math.PI*2);
+    ctx.fillStyle=hideSymbols?'#cccccc':el.fill;ctx.fill();
+    ctx.strokeStyle=hideSymbols?'#aaaaaa':el.color;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle=hideSymbols?'#888888':'#1a1a16';
+    ctx.font='700 '+(hideSymbols?14:(el.sym.length>1?13:15))+'px Pretendard,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(hideSymbols?'?':el.sym,x,cy);
+    const rotBase=[-Math.PI/2,-Math.PI/2+0.4,-Math.PI/2+0.8,-Math.PI/2+1.2];
+    for(let s=0;s<shells.length;s++){
+      const r=shellR(shells,s),ec=shells[s];
+      for(let e=0;e<ec;e++){
+        const ang=rotBase[s]+(e/ec)*Math.PI*2;
+        ctx.beginPath();ctx.arc(x+Math.cos(ang)*r,cy+Math.sin(ang)*r,5,0,Math.PI*2);
+        ctx.fillStyle=el.color;ctx.fill();
+        ctx.strokeStyle=BG;ctx.lineWidth=1.5;ctx.stroke();
+      }
+    }
+    const lx=x-br-BPAD,rx=x+br+BPAD,ty=cy-br-BPAD,by2=cy+br+BPAD,bw=9;
+    const bc=isDark?'rgba(210,208,200,0.85)':'rgba(30,28,22,0.85)';
+    ctx.strokeStyle=bc;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(lx+bw,ty);ctx.lineTo(lx,ty);ctx.lineTo(lx,by2);ctx.lineTo(lx+bw,by2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(rx-bw,ty);ctx.lineTo(rx,ty);ctx.lineTo(rx,by2);ctx.lineTo(rx-bw,by2);ctx.stroke();
+    if(!hideSymbols){
+      const charge=state==='cat'?'+'+el.charge:(Math.abs(el.charge)>1?el.charge:'−');
+      ctx.fillStyle=el.color;ctx.font='700 13px Pretendard,sans-serif';
+      ctx.textAlign='left';ctx.textBaseline='alphabetic';
+      ctx.fillText(charge,rx+3,ty+14);
+    }
+  });
+  targetWrap.appendChild(canvas);
+}
+
 
 function nextQuiz(){
   quizIdx++;
